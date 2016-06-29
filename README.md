@@ -23,11 +23,13 @@
   
 
 2. #####排队服务器内部机制实现原理：#####
+  - QueueServer与LoginServer保持长连接,每15s同步当前服务器负载。
+  	- 如果LoginServer未达到承载人数上限，依据多长时间后允许下一个客户端登录的值，QueueServer计算客户端排队所需时间。
+  	- 如果LoginServer已达到承载人数上限，QueueServer返回最长的排队时间。
   - Client连接QueueServer后，保持长连接，每15s同步当前服务器负载。
-  -	Client---------PING------->>>QueueServer
-  -	Client<<<------PONG----------QueueServer
-  -	QueueServer内部维护一个正在排队的Client列表(FIFO)。
-  -	QueueServer与LoginServer保持长连接,每15s同步当前服务器负载，如果LoginServer未达到承载人数上限，依据允许登录
+  - Client---------PING------->>>QueueServer
+  - Client<<<------PONG----------QueueServer	(QS返回信息包含：客户端当前所处队列位置、排队所需多长时间。)
+  - QueueServer内部维护一个正在排队的Client列表(FIFO)。
   
 
 ----
