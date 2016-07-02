@@ -36,4 +36,25 @@
 ####可优化空间：
 1. 涉及多次验证，Client登录高负载LoginServer会收到重定向到QueueServer的返回，并与LoginServer断开，
 		高负载过后重新登录LoginServer。(优化：不做登录认证)
-2. 
+
+##安装和运行
+1. 进入go项目
+  - cd $GOPATH/src
+2. 安装项目依赖beego/config模块
+  - go get github.com/astaxie/beego
+3.  下载serverFramework服务端框架
+  - mkdir -p $GOPATH/src/bitbucket.org/serverFramework && cd $_
+  - git clone https://zerak@bitbucket.org/serverFramework/serverFramework.git
+4.  下载项目源码
+  - git clone https://github.com/Zerak/VODone.git
+    - 编译并运行QueueServer
+      - cd $GOPATH/src/VODone/QueueServer
+      - ./build
+      - ./QueueServer
+    - 编译并运行LoginServer
+      - cd $GOPATH/src/VODone/LoginServer
+      - ./build
+      - ./LoginServer
+    - 运行Client
+      - cd $GOPATH/src/VODone/Client
+      - go run main.go
