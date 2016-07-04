@@ -40,8 +40,9 @@
 ##安装和运行
 1. 进入go项目
   - cd $GOPATH/src
-2. 安装项目依赖beego/config模块
+2. 安装项目依赖beego/config模块,以及go-sql-driver/mysql
   - go get github.com/astaxie/beego
+  - go get github.com/go-sql-driver/mysql
 3.  下载serverFramework服务端框架
   - mkdir -p $GOPATH/src/bitbucket.org/serverFramework && cd $_
   - git clone https://zerak@bitbucket.org/serverFramework/serverFramework.git
