@@ -7,12 +7,19 @@ import (
 	"bufio"
 	"time"
 	"sync"
+	"bytes"
 	"encoding/binary"
 
 	"bitbucket.org/serverFramework/serverFramework/utils"
 	"VODone/Client/msgs"
-	"bytes"
+	"github.com/zhuangsirui/binpacker"
 )
+
+type myStruct struct {
+	ID   string
+	Data string
+}
+
 
 const (
 	defaultBufferSize = 16 * 1024
@@ -130,20 +137,27 @@ func clientMsgPump(client net.Conn, startedChan chan bool) {
 	for {
 		select {
 		case <- hbChanLogin:
-			hb := new(msgs.MsgHeartbeat)
-			hb.Header = 0x05
-			hb.Cmd = 10010
-			hb.Len = 0
-			strHb := fmt.Sprintf("%c%4d%4d",hb.Header, hb.Cmd, hb.Len)
+			//var hb msgs.MsgHeartbeat
+			//hb.Header = 0x05
+			//hb.Cmd = 10010
+			//hb.Len = 0
 			buf := new(bytes.Buffer)
-			if err := binary.Write(buf, binary.BigEndian, hb); err!=nil{
+			packer := binpacker.NewPacker(buf,binary.BigEndian)
+			packer.PushByte(0x05)
+			packer.PushInt32(10010)
+			packer.PushInt32(0)
+			if err := packer.Error(); err != nil {
+				fmt.Printf("make msg err [%v]\n", err)
+				goto exit
 			}
+
 			fmt.Printf("buf[%x] \n",buf.Bytes())
 
 			if _, err := Send(client,buf.Bytes()) ; err!=nil{
+				fmt.Printf("send packet err[%v] \n", err)
 				goto exit
 			}
-			fmt.Printf("c2s heartbeat str[%v] by[%v]\n",strHb, []byte(strHb))
+			//fmt.Printf("c2s heartbeat str[%v] by[%v]\n",strHb, []byte(strHb))
 			//if _, err := Send(client,[]byte("C2LoginServerHB")) ; err!=nil{
 			//	goto exit
 			//}
