@@ -1,0 +1,4 @@
+*.log
+Client/Client
+LoginServer/LoginServer
+QueueServer/QueueServer

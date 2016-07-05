@@ -9,11 +9,6 @@ import (
 type MsgHeartbeat struct {
 }
 
-//
-//func init() {
-//	//RegisterMsg(strconv.Itoa(10010), &MsgHeartbeat{})
-//}
-
 func (m *MsgHeartbeat) ProcessMsg(p Protocol, client Client, msg *Message) {
 	ServerLogger.Info("cid[%v] msg heartbeat", client.GetID())
 

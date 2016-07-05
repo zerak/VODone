@@ -1,53 +1,62 @@
 package msgs
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
-	"strconv"
 
-	"github.com/astaxie/beego/orm"
+	//"github.com/astaxie/beego/orm"
+	"github.com/zhuangsirui/binpacker"
 
 	. "bitbucket.org/serverFramework/serverFramework/client"
 	. "bitbucket.org/serverFramework/serverFramework/core"
 	. "bitbucket.org/serverFramework/serverFramework/protocol"
-
-	. "VODone/LoginServer/models"
 )
 
 type MsgLogin struct {
 }
 
-func init() {
-	RegisterMsg(strconv.Itoa(10011), &MsgLogin{})
-}
-
 func (m *MsgLogin) ProcessMsg(p Protocol, client Client, msg *Message) {
-	ServerLogger.Info("cid[%v] msg login", client.GetID())
+	ServerLogger.Info("MsgLogin cid[%v] msg login", client.GetID())
+	ServerLogger.Info("MsgLogin msgId[%v] msgBody[%v]", msg.ID, msg.Body)
 
-	o := orm.NewOrm()
-	o.Using("default")
-	//u := new(Mtable)
-	u := new(Table)
-	u.Time = msg.Timestamp
-	_, err := o.Insert(u)
-	if err != nil {
-		ServerLogger.Error("login error %v", err)
-		_, err := p.Send(client, []byte("s2c login error"))
-		if err != nil {
-			err = fmt.Errorf("failed to send response ->%s", err)
-			client.Exit()
-		}
-	} else {
-		e := o.Read(u)
-		if e != nil {
-			ServerLogger.Info("read", u.ID, u.Time)
-		}
+	ServerLogger.Info("max client[%v] curClients[%v]", ServerApp.GetMaxClients(), ServerApp.GetCurrentClients())
 
-		_, err := p.Send(client, []byte("s2c login succ"))
-		if err != nil {
-			err = fmt.Errorf("failed to send response ->%s", err)
-			client.Exit()
-		}
+	// todo
+	// 解析登录包后,未做帐号密码验证
+	buf := new(bytes.Buffer)
+	packer := binpacker.NewPacker(buf, binary.BigEndian)
+	packer.PushByte(0x05)
+	packer.PushInt32(10014)
+	if true {
+		// 返回登录失败包
+		var flag byte
+		flag = '0'
+		addr := "127.0.0.1:60070"
+		len := 1 + len(addr)
+		packer.PushInt32((int32)(len))
+		packer.PushByte(flag)
+		packer.PushString(addr)
+	}
+	//if true {
+	//	// 返回登录成功包
+	//	flag := '1'
+	//	id := client.GetID()
+	//	name := client.GetID()
+	//	len := len(flag) + len(id) + len(name)
+	//	packer.PushInt32(len)
+	//	packer.PushByte(flag)
+	//	packer.PushString(id).PushString(name)
+	//
+	//}
+	if err := packer.Error(); err != nil {
+		fmt.Printf("make msg err [%v]\n", err)
+		panic(err)
 	}
 
+	ServerLogger.Info("buf[%x]", buf.Bytes())
+	if _, err := p.Send(client, buf.Bytes()); err != nil {
+		err = fmt.Errorf("failed to send response ->%s", err)
+		client.Exit()
+	}
 }
-

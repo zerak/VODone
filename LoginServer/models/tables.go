@@ -20,4 +20,3 @@ func init() {
 	orm.RegisterModel(new(Table))
 	orm.RegisterModel(new(Mtable))
 }
-

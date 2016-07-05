@@ -2,7 +2,6 @@ package msgs
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/astaxie/beego/orm"
 
@@ -14,10 +13,6 @@ import (
 )
 
 type MsgLogin struct {
-}
-
-func init() {
-	RegisterMsg(strconv.Itoa(10011), &MsgLogin{})
 }
 
 func (m *MsgLogin) ProcessMsg(p Protocol, client Client, msg *Message) {
