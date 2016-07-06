@@ -34,7 +34,7 @@ func (m *MsgPing) ProcessMsg(p Protocol, client Client, msg *Message) {
 		flag = '0'
 	}
 	inQueue = queue.GetQueuedIndex(client.GetID())
-	time = (int)(interVal) * inQueue
+	time = (int)(interVal) * (inQueue + 1)
 
 	packer.PushInt32((int32)(len))
 	packer.PushInt32((int32)(que))
