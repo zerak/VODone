@@ -1,11 +1,8 @@
 package main
 
 import (
-	//"fmt"
 	"runtime"
-	"sync/atomic"
 
-	//"github.com/astaxie/beego/orm"
 	_ "github.com/go-sql-driver/mysql"
 
 	"bitbucket.org/serverFramework/serverFramework/core"
@@ -16,9 +13,6 @@ import (
 )
 
 var wg utils.WaitGroupWrapper
-var MaxClients int32
-var CurClients int32
-var InterVal int32
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -48,28 +42,4 @@ func main() {
 	//core.Run(":60060")
 
 	//wg.Wait()
-}
-
-func SetMaxClients(n int32) {
-	atomic.StoreInt32(&MaxClients, n)
-}
-
-func GetMaxClients() int32 {
-	return atomic.LoadInt32(&MaxClients)
-}
-
-func SetCurClients(n int32) {
-	atomic.StoreInt32(&CurClients, n)
-}
-
-func GetCurClients() int32 {
-	return atomic.LoadInt32(&CurClients)
-}
-
-func SetInterVal(n int32) {
-	atomic.StoreInt32(&InterVal, n)
-}
-
-func GetInterVal() int32 {
-	return atomic.LoadInt32(&InterVal)
 }

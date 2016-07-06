@@ -12,6 +12,7 @@ import (
 
 	"VODone/Client/msgs"
 	"github.com/zhuangsirui/binpacker"
+	"VODone/QueueServer/queue"
 )
 
 const (
@@ -95,7 +96,7 @@ func client2LoginServerLoop(client net.Conn) {
 			break
 		}
 
-		fmt.Printf("client2LoginServerLoop header[%v] cmd[%v] len[%d] data[%x]\n", header, cmd, length, data)
+		//fmt.Printf("client2LoginServerLoop header[%v] cmd[%v] len[%d] data[%x]\n", header, cmd, length, data)
 
 		// new msg
 		//msg := Pool.Get().(*msgs.Message)
@@ -138,7 +139,7 @@ func clientMsgPumpLogin(client net.Conn, startedChan chan bool) {
 				ExitChanLogin <- 1
 			}
 
-			fmt.Printf("clientMsgPumpLogin heartbeat buf[%x] \n", buf.Bytes())
+			//fmt.Printf("clientMsgPumpLogin heartbeat buf[%x] \n", buf.Bytes())
 
 			if _, err := Send2Login(client, buf.Bytes()); err != nil {
 				fmt.Printf("clientMsgPumpLogin send heartbeat packet err[%v] \n", err)
@@ -159,7 +160,7 @@ func clientMsgPumpLogin(client net.Conn, startedChan chan bool) {
 				ExitChanLogin <- 1
 			}
 
-			fmt.Printf("clientMsgPumpQueue msgSync buf[%x] \n", buf.Bytes())
+			//fmt.Printf("clientMsgPumpQueue msgSync buf[%x] \n", buf.Bytes())
 
 			if _, err := Send2Login(client, buf.Bytes()); err != nil {
 				fmt.Printf("clientMsgPumpQueue send msgSync err[%v] \n", err)
@@ -167,7 +168,7 @@ func clientMsgPumpLogin(client net.Conn, startedChan chan bool) {
 			}
 		case msg, ok := <-MsgChanLogin:
 			if ok {
-				fmt.Printf("clientMsgPumpLogin msgChan msg[%v] body[%v]\n", msg.ID, msg.Body)
+				//fmt.Printf("clientMsgPumpLogin msgChan msg[%v] body[%v]\n", msg.ID, msg.Body)
 				if msg.ID == 60001 {
 					buf := new(bytes.Buffer)
 					packer := binpacker.NewPacker(buf, binary.BigEndian)
@@ -178,10 +179,10 @@ func clientMsgPumpLogin(client net.Conn, startedChan chan bool) {
 					if err := unpacker.Error(); err != nil {
 						ExitChanLogin <- 1
 					}
-					SetMaxClients(max)
-					SetCurClients(cur)
-					SetInterVal(time)
-					fmt.Printf("clientMsgPumpLogin msgsync login2queue max[%v] cur[%v] time[%v]\n", max, cur, time)
+					queue.SetMaxClients(max)
+					queue.SetCurClients(cur)
+					queue.SetInterVal(time)
+					//fmt.Printf("clientMsgPumpLogin msgsync login2queue max[%v] cur[%v] time[%v]\n", max, cur, time)
 				}
 
 			} else {

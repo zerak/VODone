@@ -1,6 +1,7 @@
 package msgs
 
 import (
+	"fmt"
 	"bytes"
 	"encoding/binary"
 
@@ -11,7 +12,6 @@ import (
 	. "bitbucket.org/serverFramework/serverFramework/protocol"
 
 	"VODone/QueueServer/queue"
-	"fmt"
 )
 
 type MsgPing struct {
@@ -24,22 +24,24 @@ func (m *MsgPing) ProcessMsg(p Protocol, client Client, msg *Message) {
 	packer := binpacker.NewPacker(buf, binary.BigEndian)
 	packer.PushByte(0x05)
 	packer.PushInt32(10012)
-	len := 4 + 4 + 4
-	var q,inQueue,time int
-	q = queue.GetQueueClients()
-	inQueue = queue.GetQueuedIndex(&client)
-	time = 10
+	len := 4 + 4 + 4	// queue inQueue time
+
+	interVal := queue.GetInterVal()
+	var que,inQueue,time int
+	var flag byte
+	que = queue.GetQueueClients()
+	if que <= 0 {
+		flag = '0'
+	}
+	inQueue = queue.GetQueuedIndex(client.GetID())
+	time = (int)(interVal) * inQueue
 
 	packer.PushInt32((int32)(len))
-	packer.PushInt32((int32)(q))
+	packer.PushInt32((int32)(que))
 	packer.PushInt32((int32)(inQueue))
 	packer.PushInt32((int32)(time))
 
-	if _, ok := queue.ClientsMap[client.GetID()]; !ok {
-		queue.ClientsMap[client.GetID()] = &client
-		queue.QueuedClients.PushBack(&client)
-	}
-	ServerLogger.Info("Queued clients len[%v] queue[%v] inQueue[%v] time[%v]", queue.QueuedClients.Len(), q, inQueue, time)
+	ServerLogger.Info("Queued clients flag[%v] len[%v] queue[%v] inQueue[%v] time[%v]", flag, queue.GetQueueClients(), que, inQueue, time)
 
 	if _, err := p.Send(client, buf.Bytes()); err != nil {
 		err = fmt.Errorf("failed to send response ->%s", err)

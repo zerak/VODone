@@ -1,17 +1,19 @@
-package main
+package login
 
 import (
+	"fmt"
 	"bufio"
 	"sync"
-
-	"VODone/Client/msgs"
-	"bytes"
-	"encoding/binary"
-	"fmt"
-	"github.com/zhuangsirui/binpacker"
 	"io"
 	"net"
 	"time"
+	"bytes"
+	"encoding/binary"
+
+	"github.com/zhuangsirui/binpacker"
+
+	"VODone/Client/msgs"
+	. "VODone/Client/queue"
 )
 
 var readerLogin *bufio.Reader
@@ -21,6 +23,16 @@ var MsgChanLogin chan *msgs.Message
 var ExitChanLogin chan int
 var PoolLogin sync.Pool
 
+func init() {
+	MsgChanLogin = make(chan *msgs.Message, 10000)
+	PoolLogin.New = func() interface{} {
+		return &msgs.Message{
+			Timestamp: time.Now(),
+		}
+	}
+	ExitChanLogin = make(chan int, 1)
+}
+
 func startLoginServerLoop(conn net.Conn) {
 	fmt.Printf("LoginServer start goroutine\n")
 	if _, err := Send2Login(conn, []byte("  V1")); err != nil {
@@ -28,7 +40,7 @@ func startLoginServerLoop(conn net.Conn) {
 		panic(err)
 	}
 
-	wg.Wrap(func() {
+	msgs.WG.Wrap(func() {
 		client2LoginServerLoop(conn)
 	})
 }
@@ -44,7 +56,7 @@ func client2LoginServerLoop(client net.Conn) {
 	go clientMsgPumpLogin(client, msgPumpStartedChan)
 	<-msgPumpStartedChan
 
-	buf := make([]byte, ProtocolHeaderLen)
+	buf := make([]byte, msgs.ProtocolHeaderLen)
 	for {
 		_, err = io.ReadFull(readerLogin, buf)
 		if err != nil {
@@ -76,7 +88,7 @@ func client2LoginServerLoop(client net.Conn) {
 			break
 		}
 
-		fmt.Printf("client2LoginServerLoop header[%v] cmd[%v] len[%d] data[%x]\n", header, cmd, length, data)
+		fmt.Printf("client2LoginServerLoop cid[%v] header[%v] cmd[%v] len[%d] data[%x]\n", client.LocalAddr().String(), header, cmd, length, data)
 
 		// new msg
 		//msg := Pool.Get().(*msgs.Message)
@@ -94,14 +106,14 @@ func client2LoginServerLoop(client net.Conn) {
 	//ExitChanLogin <- 1
 
 	defer func() {
-		fmt.Printf("client2LoginServerLoop exit\n")
+		fmt.Printf("client2LoginServerLoop cid[%v] exit\n", client.LocalAddr().String())
 	}()
 }
 
 func clientMsgPumpLogin(client net.Conn, startedChan chan bool) {
 	close(startedChan)
 
-	hbTickerLogin := time.NewTicker(C2LoginServerHB)
+	hbTickerLogin := time.NewTicker(msgs.C2LoginServerHB)
 	hbChanLogin := hbTickerLogin.C
 	for {
 		select {
@@ -116,15 +128,17 @@ func clientMsgPumpLogin(client net.Conn, startedChan chan bool) {
 				ExitChanLogin <- 1
 			}
 
-			fmt.Printf("clientMsgPumpLogin heartbeat buf[%x] \n", buf.Bytes())
+			fmt.Printf("clientMsgPumpLogin heartbeat cid[%v] buf[%x] \n", client.LocalAddr().String(), buf.Bytes())
 
-			if _, err := Send2Login(client, buf.Bytes()); err != nil {
+			if n, err := Send2Login(client, buf.Bytes()); err != nil || n != 9 {
 				fmt.Printf("clientMsgPumpLogin send heartbeat packet err[%v] \n", err)
 				ExitChanLogin <- 1
+			}else {
+				fmt.Printf("msg hb len[%v]\n", n)
 			}
 		case msg, ok := <-MsgChanLogin:
 			if ok {
-				fmt.Printf("clientMsgPumpLogin msgChan msg[%v] body[%v]\n", msg.ID, msg.Body)
+				fmt.Printf("clientMsgPumpLogin cid[%v] msgChan msg[%v] body[%v]\n", client.LocalAddr().String(), msg.ID, msg.Body)
 				if msg.ID == 10014 {
 					buf := new(bytes.Buffer)
 					packer := binpacker.NewPacker(buf, binary.BigEndian)
@@ -137,20 +151,27 @@ func clientMsgPumpLogin(client net.Conn, startedChan chan bool) {
 						ExitChanLogin <- 1
 					}
 
-					fmt.Printf("clientMsgPumpLogin flag[%v]\n", flag)
+					fmt.Printf("clientMsgPumpLogin cid[%v] flag[%v]\n", client.LocalAddr().String(), flag)
 					if flag == 48 {
 						//todo
 						// login server return err, and connect to queue server
 						var addr string
 						len := uint64(msg.Len - 1)
 						if err := unpacker.FetchString(len, &addr).Error(); err != nil {
-							fmt.Printf("clientMsgPumpLogin ogin failed and get queue server addr err\n")
+							fmt.Printf("clientMsgPumpLogin login failed and get queue server addr err\n")
 						}
 						fmt.Printf("clientMsgPumpLogin login failed and redirect to queue server[%v]\n", addr)
-						connect2QueueServer(addr)
+						Connect2QueueServer(addr)
 						ExitChanLogin <- 1
 					} else {
-						fmt.Printf("clientMsgPumpLogin login success\n")
+						var uid int64
+						var name string
+						len := uint64(msg.Len - 1 - 8)
+						if err := unpacker.FetchInt64(&uid).FetchString(len, &name).Error(); err != nil {
+							fmt.Printf("clientMsgPumpLogin login success but unpack failed [%v]\n", err)
+							ExitChanLogin <- 1
+						}
+						fmt.Printf("clientMsgPumpLogin login success uid[%v] name[%v]\n", uid, name)
 					}
 				}
 			} else {
@@ -189,7 +210,7 @@ func Send2Login(c net.Conn, data []byte) (int, error) {
 	return n, nil
 }
 
-func sendLoginPakcet(conn net.Conn, interVal time.Duration) {
+func SendLoginPakcet(conn net.Conn, interVal time.Duration) {
 	// todo
 	// 向LoginServer发送登录信息
 	ticker := time.NewTicker(time.Second * interVal)
@@ -219,14 +240,14 @@ func sendLoginPakcet(conn net.Conn, interVal time.Duration) {
 	}
 }
 
-func connect2LoginServer(addr string) net.Conn {
+func Connect2LoginServer(addr string) net.Conn {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		panic(err)
 	}
 
-	readerLogin = bufio.NewReaderSize(conn, defaultBufferSize)
-	writerLogin = bufio.NewWriterSize(conn, defaultBufferSize)
+	readerLogin = bufio.NewReaderSize(conn, msgs.DefaultBufferSize)
+	writerLogin = bufio.NewWriterSize(conn, msgs.DefaultBufferSize)
 
 	startLoginServerLoop(conn)
 	return conn

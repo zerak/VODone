@@ -1,4 +1,4 @@
-package main
+package queue
 
 import (
 	"bufio"
@@ -21,6 +21,15 @@ var MsgChanQueue chan *msgs.Message
 var ExitChanQueue chan int
 var PoolQueue sync.Pool
 
+func init() {
+	MsgChanQueue = make(chan *msgs.Message, 10000)
+	PoolQueue.New = func() interface{} {
+		return &msgs.Message{
+			Timestamp: time.Now(),
+		}
+	}
+	ExitChanQueue = make(chan int, 1)
+}
 func startQueueServerLoop(conn net.Conn) {
 	fmt.Printf("start Queue server goroutine\n")
 	if _, err := Send2Queue(conn, []byte("  V1")); err != nil {
@@ -28,7 +37,7 @@ func startQueueServerLoop(conn net.Conn) {
 		panic(err)
 	}
 
-	wg.Wrap(func() {
+	msgs.WG.Wrap(func() {
 		client2QueueServerLoop(conn)
 	})
 }
@@ -44,7 +53,7 @@ func client2QueueServerLoop(client net.Conn) {
 	go clientMsgPumpQueue(client, msgPumpStartedChan)
 	<-msgPumpStartedChan
 
-	buf := make([]byte, ProtocolHeaderLen)
+	buf := make([]byte, msgs.ProtocolHeaderLen)
 	for {
 		_, err = io.ReadFull(readerQueue, buf)
 		if err != nil {
@@ -91,16 +100,15 @@ func client2QueueServerLoop(client net.Conn) {
 	}
 
 	client.Close()
-
 }
 
 func clientMsgPumpQueue(client net.Conn, startedChan chan bool) {
 	close(startedChan)
 
-	hbTickerQueue := time.NewTicker(C2QueueServerHB)
+	hbTickerQueue := time.NewTicker(msgs.C2QueueServerHB)
 	hbChanQueue := hbTickerQueue.C
 
-	ppTickerQueue := time.NewTicker(C2QueueServerPP)
+	ppTickerQueue := time.NewTicker(msgs.C2QueueServerPP)
 	ppChanQueue := ppTickerQueue.C
 	for {
 		select {
@@ -224,15 +232,15 @@ func sendQueuePakcet(conn net.Conn) {
 	}
 }
 
-func connect2QueueServer(addr string) net.Conn {
+func Connect2QueueServer(addr string) net.Conn {
 	fmt.Printf("connect2QueueServer [%v]\n", addr)
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		panic(err)
 	}
 
-	readerQueue = bufio.NewReaderSize(conn, defaultBufferSize)
-	writerQueue = bufio.NewWriterSize(conn, defaultBufferSize)
+	readerQueue = bufio.NewReaderSize(conn, msgs.DefaultBufferSize)
+	writerQueue = bufio.NewWriterSize(conn, msgs.DefaultBufferSize)
 
 	startQueueServerLoop(conn)
 

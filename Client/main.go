@@ -5,19 +5,10 @@ import (
 	"time"
 
 	"VODone/Client/msgs"
-	"bitbucket.org/serverFramework/serverFramework/utils"
+	. "VODone/Client/login"
+	. "VODone/Client/queue"
 )
 
-const (
-	defaultBufferSize = 16 * 1024
-	ProtocolHeaderLen = 9 // header1 + cmd4 + length4
-
-	C2LoginServerHB = 5 * time.Second
-	C2QueueServerHB = 5 * time.Second
-	C2QueueServerPP = 1 * time.Second
-)
-
-var wg utils.WaitGroupWrapper
 var addr string
 var Max, Cur, Time int32
 
@@ -43,10 +34,10 @@ func init() {
 
 func main() {
 	// 1,first connect to login server
-	conn := connect2LoginServer(addr)
-	sendLoginPakcet(conn, 12) // 10s以后发送登录包
+	conn := Connect2LoginServer(addr)
+	SendLoginPakcet(conn, 3) // 10s以后发送登录包
 
-	wg.Wait()
+	msgs.WG.Wait()
 
 	fmt.Printf("client exit\n")
 }

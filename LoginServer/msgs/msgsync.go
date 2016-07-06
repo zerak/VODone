@@ -16,14 +16,17 @@ type MsgSync struct {
 }
 
 func (m *MsgSync) ProcessMsg(p Protocol, client Client, msg *Message) {
-	ServerLogger.Info("cid[%v] msg sync", client.GetID())
+	//ServerLogger.Info("cid[%v] msg sync", client.GetID())
+
+	QueueServerIdentify = client.String()
+	ServerLogger.Warn("QueueServer[%v]",client.String())
 
 	buf := new(bytes.Buffer)
 	packer := binpacker.NewPacker(buf, binary.BigEndian)
 	packer.PushByte(0x05)
 	packer.PushInt32(60001)
 	Max := ServerApp.GetMaxClients()
-	Cur := ServerApp.GetCurrentClients()
+	Cur := ServerApp.GetAuthClients()
 	Time := 10
 	//len := len(int32(Max)) + len(int32(Cur)) + len(int32(Time))
 	len := 4 + 4 + 4
@@ -38,7 +41,7 @@ func (m *MsgSync) ProcessMsg(p Protocol, client Client, msg *Message) {
 		client.Exit()
 	}
 
-	ServerLogger.Info("msgSync login2queue buf[%x] len[%v] max[%v] cur[%v]", buf.Bytes(), len, Max, Cur)
+	//ServerLogger.Info("msgSync login2queue buf[%x] len[%v] max[%v] auth[%v]", buf.Bytes(), len, Max, Cur)
 	if _, err := p.Send(client, buf.Bytes()); err != nil {
 		err = fmt.Errorf("failed to send response ->%s", err)
 		client.Exit()

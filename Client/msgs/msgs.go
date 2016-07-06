@@ -4,7 +4,20 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"bitbucket.org/serverFramework/serverFramework/utils"
 )
+
+const (
+	DefaultBufferSize = 16 * 1024
+	ProtocolHeaderLen = 9 // header1 + cmd4 + length4
+
+	C2LoginServerHB = 5 * time.Second
+	C2QueueServerHB = 5 * time.Second
+	C2QueueServerPP = 1 * time.Second
+)
+
+var WG utils.WaitGroupWrapper
 
 type Message struct {
 	ID        int
@@ -73,7 +86,7 @@ type MsgPingC2Q struct {
 }
 type MsgPongQ2C struct {
 	Queue   int // 当前服务器的排队人数
-	InQueue int // 当前所在排队服务器的位置
+	InQueue int // 当前所在排队服务器的位置(返回排在前面的人数)
 	Time    int // 所需连入LoginServer的预估时间
 }
 
@@ -87,14 +100,16 @@ type MsgPongQ2C struct {
 	h:0x05, cmd:10013,len:x
 	msg logs2c loginserver2client
 	h:0x05, cmd:10014,len:x
+	flag/addr
+	flag/uid/name
 */
 type MsgLoginC2S struct {
 	Account [512]byte // 帐号
 	Passwd  [512]byte // 密码
 }
 type MsgLoginS2C struct {
-	Flag byte      // 登录成员与否标识 1成功,0失败
-	UID  int       // user id
-	Name [512]byte // 名字
-	Addr [32]byte  // 如果LoginServer负载高,返回QueueServer登录地址,"192.168.1.127:60060"
+	Flag byte // 登录成员与否标识 1成功,0失败
+	Addr byte // 如果LoginServer负载高,返回QueueServer登录地址,"192.168.1.127:60060"
+	UID  int64  // user id
+	Name byte // 名字
 }

@@ -6,6 +6,8 @@ import (
 )
 
 func init() {
+	RegisterMsg(CONNECT, &MsgConnect{})
+	RegisterMsg(DISCONNECT, &MsgDisconnect{})
 	//RegisterMsg(strconv.Itoa(60001), &MsgSync{}) // queueServer2loginServer
 
 	RegisterMsg(strconv.Itoa(10010), &MsgHeartbeat{})
