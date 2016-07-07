@@ -42,7 +42,7 @@ func (m *MsgLogin) ProcessMsg(p Protocol, client Client, msg *Message) {
 		packer.PushByte(flag)
 		packer.PushString(addr)
 
-		client.SetAuth(false)	// 设置未认证标识
+		client.SetAuth(false) // 设置未认证标识
 		ServerLogger.Info("MsgLogin failed")
 	} else {
 		// todo
@@ -57,8 +57,9 @@ func (m *MsgLogin) ProcessMsg(p Protocol, client Client, msg *Message) {
 		packer.PushInt64(id).PushString(name)
 
 		// todo
-		// 3,异步登录成功后,服务器更新当前登录人数
+		// 3,异步登录成功后,服务器更新当前登录人数及客户端认证状态
 		ServerApp.AuthClient(true)
+		client.SetAuth(true)
 		ServerLogger.Info("MsgLogin succ")
 	}
 

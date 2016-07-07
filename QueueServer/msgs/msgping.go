@@ -1,9 +1,9 @@
 package msgs
 
 import (
-	"fmt"
 	"bytes"
 	"encoding/binary"
+	"fmt"
 
 	"github.com/zhuangsirui/binpacker"
 
@@ -24,10 +24,10 @@ func (m *MsgPing) ProcessMsg(p Protocol, client Client, msg *Message) {
 	packer := binpacker.NewPacker(buf, binary.BigEndian)
 	packer.PushByte(0x05)
 	packer.PushInt32(10012)
-	len := 4 + 4 + 4	// queue inQueue time
+	len := 1 + 4 + 4 + 4 // flag + queue inQueue time
 
 	interVal := queue.GetInterVal()
-	var que,inQueue,time int
+	var que, inQueue, time int
 	var flag byte
 	que = queue.GetQueueClients()
 	if que <= 0 {
@@ -37,6 +37,7 @@ func (m *MsgPing) ProcessMsg(p Protocol, client Client, msg *Message) {
 	time = (int)(interVal) * (inQueue + 1)
 
 	packer.PushInt32((int32)(len))
+	packer.PushByte(flag)
 	packer.PushInt32((int32)(que))
 	packer.PushInt32((int32)(inQueue))
 	packer.PushInt32((int32)(time))

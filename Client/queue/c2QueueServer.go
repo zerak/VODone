@@ -4,14 +4,15 @@ import (
 	"bufio"
 	"sync"
 
-	"VODone/Client/msgs"
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/zhuangsirui/binpacker"
 	"io"
 	"net"
 	"time"
+	"github.com/zhuangsirui/binpacker"
+
+	"VODone/Client/msgs"
 )
 
 var readerQueue *bufio.Reader
@@ -30,7 +31,7 @@ func init() {
 	}
 	ExitChanQueue = make(chan int, 1)
 }
-func startQueueServerLoop(conn net.Conn) {
+func StartQueueServerLoop(conn net.Conn) {
 	fmt.Printf("start Queue server goroutine\n")
 	if _, err := Send2Queue(conn, []byte("  V1")); err != nil {
 		fmt.Printf("send protocol err\n")
@@ -160,15 +161,39 @@ func clientMsgPumpQueue(client net.Conn, startedChan chan bool) {
 				fmt.Printf("clientMsgPumpQueue msg[%v] body[%v]\n", msg.ID, msg.Body)
 				if msg.ID == 10012 {
 					buf := new(bytes.Buffer)
-					packer := binpacker.NewPacker(buf,binary.BigEndian)
+					fmt.Printf("clientMsgPumpQueue 1\n")
+					packer := binpacker.NewPacker(buf, binary.BigEndian)
 					packer.PushString(string(msg.Body[:]))
-					unpacker := binpacker.NewUnpacker(buf,binary.BigEndian)
-					var queue, inQueue, time int32
-					if err := unpacker.FetchInt32(&queue).FetchInt32(&inQueue).FetchInt32(&time).Error(); err != nil{
-						fmt.Printf("clientMsgPumpQueue unpacker msgPing err[%v]\n", err)
+					unpacker := binpacker.NewUnpacker(buf, binary.BigEndian)
+					var flag byte
+					if err := unpacker.FetchByte(&flag).Error(); err != nil{
+						fmt.Printf("clientMsgPumpQueue unpacker msgPing flag err[%v]\n", err)
 						ExitChanQueue <- 1
 					}
-					fmt.Printf("clientMsgPumpQueue msgPing queue[%v] inQueue[%v] time[%v]\n", queue, inQueue, time)
+					fmt.Printf("clientMsgPumpQueue flag[%v]\n",flag)
+					if flag == 0 {
+						fmt.Printf("clientMsgPumpQueue 1.2\n")
+						var queue, inQueue, time int32
+						if err := unpacker.FetchInt32(&queue).FetchInt32(&inQueue).FetchInt32(&time).Error(); err != nil {
+							fmt.Printf("clientMsgPumpQueue unpacker msgPing err[%v]\n", err)
+							ExitChanQueue <- 1
+						}
+						fmt.Printf("clientMsgPumpQueue msgPing queue[%v] inQueue[%v] time[%v]\n", queue, inQueue, time)
+					}else{
+						fmt.Printf("clientMsgPumpQueue 2\n")
+						uuidlen := 36
+						addrlen := uint64(msg.Len - 1 - uuidlen)
+						var uuid, addr string
+						if err := unpacker.FetchString(36,&uuid).FetchString(addrlen,&addr).Error(); err != nil {
+							fmt.Printf("clientMsgPumpQueue unpacker msgPing login err[%v]\n", err)
+							ExitChanQueue <- 1
+						}
+						fmt.Printf("clientMsgPumpQueue msgPing uuid[%v] addr[%v]\n", uuid, addr)
+
+						// todo 拿着uuid登录loginServer
+						//Connect2LoginServer(addr)
+						ExitChanQueue <- 1
+					}
 				}
 			} else {
 				fmt.Printf("clientMsgPumpQueue from MsgChan not ok\n")
@@ -242,7 +267,7 @@ func Connect2QueueServer(addr string) net.Conn {
 	readerQueue = bufio.NewReaderSize(conn, msgs.DefaultBufferSize)
 	writerQueue = bufio.NewWriterSize(conn, msgs.DefaultBufferSize)
 
-	startQueueServerLoop(conn)
+	StartQueueServerLoop(conn)
 
 	return conn
 }

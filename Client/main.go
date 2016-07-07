@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"VODone/Client/msgs"
 	. "VODone/Client/login"
+	"VODone/Client/msgs"
 	. "VODone/Client/queue"
 )
 

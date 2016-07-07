@@ -1,8 +1,8 @@
 package msgs
 
 import (
-	"strconv"
 	. "bitbucket.org/serverFramework/serverFramework/core"
+	"strconv"
 )
 
 var QueueServerIdentify string

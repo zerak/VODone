@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"VODone/Client/msgs"
-	"github.com/zhuangsirui/binpacker"
 	"VODone/QueueServer/queue"
+	"github.com/zhuangsirui/binpacker"
 )
 
 const (
@@ -182,6 +182,8 @@ func clientMsgPumpLogin(client net.Conn, startedChan chan bool) {
 					queue.SetMaxClients(max)
 					queue.SetCurClients(cur)
 					queue.SetInterVal(time)
+					// todo NOTE 发送消息的设置时机
+					queue.Timer = (int)(time)
 					//fmt.Printf("clientMsgPumpLogin msgsync login2queue max[%v] cur[%v] time[%v]\n", max, cur, time)
 				}
 
@@ -207,9 +209,7 @@ exit:
 
 func Send2Login(c net.Conn, data []byte) (int, error) {
 	writeLockLogin.Lock()
-	// todo
-
-	// check write len(data) size buf
+	// todo check write len(data) size buf
 	n, err := writerLogin.Write(data)
 	if err != nil {
 		writeLockLogin.Unlock()

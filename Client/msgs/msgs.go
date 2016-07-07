@@ -81,13 +81,16 @@ type MsgSyncL2Q struct {
 	h:0x05, cmd:10011,len:0
 	msg pong queueserver2client
 	h:0x05, cmd:10012,len:0
+	flag/queue/inqueue/time
+	flag/uuid/addr
 */
 type MsgPingC2Q struct {
 }
 type MsgPongQ2C struct {
-	Queue   int // 当前服务器的排队人数
-	InQueue int // 当前所在排队服务器的位置(返回排在前面的人数)
-	Time    int // 所需连入LoginServer的预估时间
+	Flag    byte // 是否可以登录标识
+	Queue   int  // 当前服务器的排队人数
+	InQueue int  // 当前所在排队服务器的位置(返回排在前面的人数)
+	Time    int  // 所需连入LoginServer的预估时间
 }
 
 /*
@@ -98,6 +101,9 @@ type MsgPongQ2C struct {
 /*
 	msg logc2s client2loginserver
 	h:0x05, cmd:10013,len:x
+	flag/account/passwd
+	flag/uuid/account/passwd
+
 	msg logs2c loginserver2client
 	h:0x05, cmd:10014,len:x
 	flag/addr
@@ -108,8 +114,8 @@ type MsgLoginC2S struct {
 	Passwd  [512]byte // 密码
 }
 type MsgLoginS2C struct {
-	Flag byte // 登录成员与否标识 1成功,0失败
-	Addr byte // 如果LoginServer负载高,返回QueueServer登录地址,"192.168.1.127:60060"
-	UID  int64  // user id
-	Name byte // 名字
+	Flag byte  // 登录成员与否标识 1成功,0失败
+	Addr byte  // 如果LoginServer负载高,返回QueueServer登录地址,"192.168.1.127:60060"
+	UID  int64 // user id
+	Name byte  // 名字
 }

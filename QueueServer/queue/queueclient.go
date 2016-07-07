@@ -27,7 +27,8 @@ type QueueClient struct {
 
 	writeLock sync.RWMutex
 	metaLock  sync.RWMutex
-	index     int // the index of the queue list, begin of 0
+	index     int    // the index of the queue list, begin of 0
+	Session   string // the queued client ticket
 }
 
 func (qc *QueueClient) String() string {

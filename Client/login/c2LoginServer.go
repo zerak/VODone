@@ -1,14 +1,14 @@
 package login
 
 import (
-	"fmt"
 	"bufio"
-	"sync"
-	"io"
-	"net"
-	"time"
 	"bytes"
 	"encoding/binary"
+	"fmt"
+	"io"
+	"net"
+	"sync"
+	"time"
 
 	"github.com/zhuangsirui/binpacker"
 
@@ -16,8 +16,8 @@ import (
 	. "VODone/Client/queue"
 )
 
-var readerLogin *bufio.Reader
-var writerLogin *bufio.Writer
+var ReaderLogin *bufio.Reader
+var WriterLogin *bufio.Writer
 var writeLockLogin sync.RWMutex
 var MsgChanLogin chan *msgs.Message
 var ExitChanLogin chan int
@@ -33,7 +33,7 @@ func init() {
 	ExitChanLogin = make(chan int, 1)
 }
 
-func startLoginServerLoop(conn net.Conn) {
+func StartLoginServerLoop(conn net.Conn) {
 	fmt.Printf("LoginServer start goroutine\n")
 	if _, err := Send2Login(conn, []byte("  V1")); err != nil {
 		fmt.Printf("send protocol err\n")
@@ -58,9 +58,9 @@ func client2LoginServerLoop(client net.Conn) {
 
 	buf := make([]byte, msgs.ProtocolHeaderLen)
 	for {
-		_, err = io.ReadFull(readerLogin, buf)
+		_, err = io.ReadFull(ReaderLogin, buf)
 		if err != nil {
-			fmt.Printf("client2LoginServerLoop read head from remote[%v] err->%v buffed->%v\n", client.RemoteAddr(), err, readerLogin.Buffered())
+			fmt.Printf("client2LoginServerLoop read head from remote[%v] err->%v buffed->%v\n", client.RemoteAddr(), err, ReaderLogin.Buffered())
 			//ExitChanLogin <- 1
 			break
 		}
@@ -81,9 +81,9 @@ func client2LoginServerLoop(client net.Conn) {
 
 		// data
 		data := make([]byte, length)
-		_, err = io.ReadFull(readerLogin, data)
+		_, err = io.ReadFull(ReaderLogin, data)
 		if err != nil {
-			fmt.Printf("client2LoginServerLoop read data from client[%v] err->%v buffed->%v", client.RemoteAddr(), err, readerLogin.Buffered())
+			fmt.Printf("client2LoginServerLoop read data from client[%v] err->%v buffed->%v", client.RemoteAddr(), err, ReaderLogin.Buffered())
 			//ExitChanLogin <- 1
 			break
 		}
@@ -133,7 +133,7 @@ func clientMsgPumpLogin(client net.Conn, startedChan chan bool) {
 			if n, err := Send2Login(client, buf.Bytes()); err != nil || n != 9 {
 				fmt.Printf("clientMsgPumpLogin send heartbeat packet err[%v] \n", err)
 				ExitChanLogin <- 1
-			}else {
+			} else {
 				fmt.Printf("msg hb len[%v]\n", n)
 			}
 		case msg, ok := <-MsgChanLogin:
@@ -199,12 +199,12 @@ func Send2Login(c net.Conn, data []byte) (int, error) {
 	// todo
 
 	// check write len(data) size buf
-	n, err := writerLogin.Write(data)
+	n, err := WriterLogin.Write(data)
 	if err != nil {
 		writeLockLogin.Unlock()
 		return n, err
 	}
-	writerLogin.Flush()
+	WriterLogin.Flush()
 	writeLockLogin.Unlock()
 
 	return n, nil
@@ -246,9 +246,9 @@ func Connect2LoginServer(addr string) net.Conn {
 		panic(err)
 	}
 
-	readerLogin = bufio.NewReaderSize(conn, msgs.DefaultBufferSize)
-	writerLogin = bufio.NewWriterSize(conn, msgs.DefaultBufferSize)
+	ReaderLogin = bufio.NewReaderSize(conn, msgs.DefaultBufferSize)
+	WriterLogin = bufio.NewWriterSize(conn, msgs.DefaultBufferSize)
 
-	startLoginServerLoop(conn)
+	StartLoginServerLoop(conn)
 	return conn
 }

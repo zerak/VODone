@@ -1,8 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"flag"
+	"fmt"
 
 	"bitbucket.org/serverFramework/serverFramework/utils"
 
@@ -15,7 +15,7 @@ var wg utils.WaitGroupWrapper
 
 func main() {
 	maxClient := flag.Int("max", 100, "client")
-	tt := flag.Int("time",60,"the tester run time")
+	tt := flag.Int("time", 60, "the tester run time")
 
 	fmt.Printf("client[%v] time[%v]\n", *maxClient, *tt)
 
@@ -24,7 +24,7 @@ func main() {
 	for i := 0; i < *maxClient; i++ {
 		wg.Wrap(func() {
 			conn := login.Connect2LoginServer(addr)
-			login.SendLoginPakcet(conn,2)
+			login.SendLoginPakcet(conn, 2)
 			//time.Sleep(time.Microsecond)
 		})
 	}

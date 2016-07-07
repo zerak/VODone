@@ -1,9 +1,9 @@
 package msgs
 
 import (
-	"fmt"
 	"bytes"
 	"encoding/binary"
+	"fmt"
 
 	"github.com/zhuangsirui/binpacker"
 
@@ -19,7 +19,7 @@ func (m *MsgSync) ProcessMsg(p Protocol, client Client, msg *Message) {
 	//ServerLogger.Info("cid[%v] msg sync", client.GetID())
 
 	QueueServerIdentify = client.String()
-	ServerLogger.Warn("QueueServer[%v]",client.String())
+	ServerLogger.Warn("QueueServer[%v]", client.String())
 
 	buf := new(bytes.Buffer)
 	packer := binpacker.NewPacker(buf, binary.BigEndian)
