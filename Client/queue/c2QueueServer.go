@@ -7,10 +7,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/zhuangsirui/binpacker"
 	"io"
 	"net"
 	"time"
-	"github.com/zhuangsirui/binpacker"
 
 	"VODone/Client/msgs"
 )
@@ -86,7 +86,7 @@ func client2QueueServerLoop(client net.Conn) {
 			break
 		}
 
-		fmt.Printf("client2QueueServerLoop header[%v] cmd[%v] len[%d] data[%x]\n", header, cmd, length, data)
+		//fmt.Printf("client2QueueServerLoop header[%v] cmd[%v] len[%d] data[%x]\n", header, cmd, length, data)
 
 		// new msg
 		//msg := Pool.Get().(*msgs.Message)
@@ -129,69 +129,68 @@ func clientMsgPumpQueue(client net.Conn, startedChan chan bool) {
 				break
 			}
 
-			fmt.Printf("clientMsgPumpQueue buf[%x] \n", buf.Bytes())
+			//fmt.Printf("clientMsgPumpQueue buf[%x] \n", buf.Bytes())
 
 			if _, err := Send2Queue(client, buf.Bytes()); err != nil {
 				fmt.Printf("clientMsgPumpQueue send packet err[%v] \n", err)
 				ExitChanQueue <- 1
 			}
 		case <-ppChanQueue:
-			//var hb msgs.MsgPing
-			//hb.Header = 0x05
-			//hb.Cmd = 10011
-			//hb.Len = 0
-			buf := new(bytes.Buffer)
-			packer := binpacker.NewPacker(buf, binary.BigEndian)
-			packer.PushByte(0x05)
-			packer.PushInt32(10011)
-			packer.PushInt32(0)
-			if err := packer.Error(); err != nil {
-				fmt.Printf("clientMsgPumpQueue make msgPing err [%v]\n", err)
-				ExitChanQueue <- 1
-			}
-
-			fmt.Printf("clientMsgPumpQueue msgPing buf[%x] \n", buf.Bytes())
-
-			if _, err := Send2Queue(client, buf.Bytes()); err != nil {
-				fmt.Printf("clientMsgPumpQueue send packetPing err[%v] \n", err)
-				ExitChanQueue <- 1
-			}
+			////var hb msgs.MsgPing
+			////hb.Header = 0x05
+			////hb.Cmd = 10011
+			////hb.Len = 0
+			//buf := new(bytes.Buffer)
+			//packer := binpacker.NewPacker(buf, binary.BigEndian)
+			//packer.PushByte(0x05)
+			//packer.PushInt32(10011)
+			//packer.PushInt32(0)
+			//if err := packer.Error(); err != nil {
+			//	fmt.Printf("clientMsgPumpQueue make msgPing err [%v]\n", err)
+			//	ExitChanQueue <- 1
+			//}
+			//
+			////fmt.Printf("clientMsgPumpQueue msgPing buf[%x] \n", buf.Bytes())
+			//
+			//if _, err := Send2Queue(client, buf.Bytes()); err != nil {
+			//	fmt.Printf("clientMsgPumpQueue send packetPing err[%v] \n", err)
+			//	ExitChanQueue <- 1
+			//}
 		case msg, ok := <-MsgChanQueue:
 			if ok {
-				fmt.Printf("clientMsgPumpQueue msg[%v] body[%v]\n", msg.ID, msg.Body)
+				//fmt.Printf("clientMsgPumpQueue msg[%v] body[%v]\n", msg.ID, msg.Body)
 				if msg.ID == 10012 {
 					buf := new(bytes.Buffer)
-					fmt.Printf("clientMsgPumpQueue 1\n")
 					packer := binpacker.NewPacker(buf, binary.BigEndian)
 					packer.PushString(string(msg.Body[:]))
 					unpacker := binpacker.NewUnpacker(buf, binary.BigEndian)
 					var flag byte
-					if err := unpacker.FetchByte(&flag).Error(); err != nil{
+					if err := unpacker.FetchByte(&flag).Error(); err != nil {
 						fmt.Printf("clientMsgPumpQueue unpacker msgPing flag err[%v]\n", err)
 						ExitChanQueue <- 1
 					}
-					fmt.Printf("clientMsgPumpQueue flag[%v]\n",flag)
+					//fmt.Printf("clientMsgPumpQueue flag[%v]\n", flag)
 					if flag == 0 {
-						fmt.Printf("clientMsgPumpQueue 1.2\n")
 						var queue, inQueue, time int32
 						if err := unpacker.FetchInt32(&queue).FetchInt32(&inQueue).FetchInt32(&time).Error(); err != nil {
 							fmt.Printf("clientMsgPumpQueue unpacker msgPing err[%v]\n", err)
 							ExitChanQueue <- 1
 						}
-						fmt.Printf("clientMsgPumpQueue msgPing queue[%v] inQueue[%v] time[%v]\n", queue, inQueue, time)
-					}else{
-						fmt.Printf("clientMsgPumpQueue 2\n")
+						//fmt.Printf("clientMsgPumpQueue  queue[%v] waitting No.[%v] time[%v]\n", queue, inQueue, time)
+						fmt.Printf("当前排队总人数[%v]  前面等待人数[%v] 估计登录用时[%vs]\n", queue, inQueue, time)
+					} else {
 						uuidlen := 36
 						addrlen := uint64(msg.Len - 1 - uuidlen)
 						var uuid, addr string
-						if err := unpacker.FetchString(36,&uuid).FetchString(addrlen,&addr).Error(); err != nil {
+						if err := unpacker.FetchString(36, &uuid).FetchString(addrlen, &addr).Error(); err != nil {
 							fmt.Printf("clientMsgPumpQueue unpacker msgPing login err[%v]\n", err)
 							ExitChanQueue <- 1
 						}
 						fmt.Printf("clientMsgPumpQueue msgPing uuid[%v] addr[%v]\n", uuid, addr)
 
 						// todo 拿着uuid登录loginServer
-						//Connect2LoginServer(addr)
+						conn := QueueConnect2LoginServer(addr)
+						SendLoginPakcetWithKey(conn, uuid) // 10s以后发送登录包
 						ExitChanQueue <- 1
 					}
 				}
@@ -225,36 +224,6 @@ func Send2Queue(c net.Conn, data []byte) (int, error) {
 	writeLockQueue.Unlock()
 
 	return n, nil
-}
-
-func sendQueuePakcet(conn net.Conn) {
-	// todo
-	// 向QueueServer发送登录信息
-	ticker := time.NewTicker(time.Second * 5)
-	for _ = range ticker.C {
-		buf := new(bytes.Buffer)
-		packer := binpacker.NewPacker(buf, binary.BigEndian)
-		packer.PushByte(0x05)
-		packer.PushInt32(10013)
-		accout := "account"
-		passwd := "passwd"
-		len := len(accout) + len(passwd)
-		packer.PushInt32((int32)(len))
-		packer.PushString(accout).PushString(passwd)
-		if err := packer.Error(); err != nil {
-			fmt.Printf("clientMsgPumpQueue make msg err [%v]\n", err)
-			panic(err)
-		}
-
-		fmt.Printf("client send buf[%x] dataLen[%v]\n", buf.Bytes(), len)
-
-		if _, err := Send2Queue(conn, buf.Bytes()); err != nil {
-			fmt.Printf("clientMsgPumpQueue send c2sQueue packet err[%v] \n", err)
-			panic(err)
-		}
-
-		ticker.Stop()
-	}
 }
 
 func Connect2QueueServer(addr string) net.Conn {

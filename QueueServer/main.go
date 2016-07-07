@@ -1,12 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"bytes"
 	"encoding/binary"
 	"net"
 	"runtime"
-	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/zhuangsirui/binpacker"
@@ -43,8 +41,6 @@ func main() {
 	addr := "127.0.0.1:60060"
 	connect2LoginServer(addr)
 
-	fmt.Printf("timer[%v]\n",queue.Timer)
-	// 开启Timer,用于通知排队的客户端何时登录
 	wg.Wrap(func() {
 		serveQueue()
 	})
@@ -58,13 +54,11 @@ func main() {
 }
 
 func serveQueue() {
-	fmt.Printf("QueueServer start timer routine\n")
-	queueTimer := time.NewTicker((time.Duration(queue.Timer) * time.Second))
-	qTimerCh := queueTimer.C
+	core.ServerLogger.Info("QueueServer start timer routine")
 	for {
 		select {
-		case <-qTimerCh:
-			if queue.QueuedClients.Front() != nil {
+		case <- queue.NotifyChan:
+			if queue.QueuedClients.Front() != nil && queue.AuthClients < queue.MaxClients {
 				qc := queue.QueuedClients.Front().Value.(*queue.QueueClient)
 
 				buf := new(bytes.Buffer)
@@ -82,33 +76,22 @@ func serveQueue() {
 				packer.PushString(uuid)
 				packer.PushString(addr)
 
-				if _, err := noticeLogin(qc.Conn, buf.Bytes()); err != nil{
+				if _, err := notice(qc.Conn, buf.Bytes()); err != nil {
 				}
 
-				// TODO 向客户端发送重新登录消息,不管发送成功还是失败,都断开连接
+				// TODO NOTE 向客户端发送重新登录消息,不管发送成功还是失败,都断开连接
 				qc.Conn.Close()
-
-				// 重置Timer
-				queue.Timer =  (int)(queue.GetInterVal())
-				queue.TimerReset <- 1
-			}else {
-				fmt.Printf("QueueServer queued client nil \n")
 			}
-
-		case <-queue.TimerReset:
-			//queueTimer.Reset((time.Duration(queue.Timer) * time.Second))
 		}
 	}
 
 	defer func() {
-		fmt.Printf("QueueServer timer routine exit\n")
-		queueTimer.Stop()
-		close(queue.TimerReset)
+		core.ServerLogger.Info("QueueServer timer routine exit\n")
 	}()
 }
 
-func noticeLogin(conn net.Conn, by []byte) (n int, err error) {
-	fmt.Printf("send to login\n")
+func notice(conn net.Conn, by []byte) (n int, err error) {
+	core.ServerLogger.Info("MsgLogin Queue server send to client notify relogin\n")
 	if n, err := conn.Write(by); err != nil {
 		return n, err
 	}

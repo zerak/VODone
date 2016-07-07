@@ -15,6 +15,6 @@ type MsgHeartbeat struct {
 //}
 
 func (m *MsgHeartbeat) ProcessMsg(p Protocol, client Client, msg *Message) {
-	ServerLogger.Info("cid[%v] msg heartbeat", client.GetID())
+	//ServerLogger.Info("cid[%v] msg heartbeat", client.GetID())
 
 }

@@ -1,13 +1,19 @@
 package msgs
 
 import (
+	"net"
+	"bytes"
+	"container/list"
+	"encoding/binary"
+
+	"github.com/zhuangsirui/binpacker"
+
+	"bitbucket.org/serverFramework/serverFramework/utils"
 	. "bitbucket.org/serverFramework/serverFramework/client"
 	. "bitbucket.org/serverFramework/serverFramework/core"
 	. "bitbucket.org/serverFramework/serverFramework/protocol"
 
 	"VODone/QueueServer/queue"
-	"bitbucket.org/serverFramework/serverFramework/utils"
-	"container/list"
 )
 
 type MsgConnect struct {
@@ -28,6 +34,10 @@ func (m *MsgConnect) ProcessMsg(p Protocol, client Client, msg *Message) {
 
 		queue.ClientsMap[client.GetID()] = &qc
 		queue.QueuedClients.PushBack(&qc)
+	}
+
+	if err := notifyOtherClientQueueInfo(); err != nil {
+		client.Exit()
 	}
 }
 
@@ -58,7 +68,79 @@ func (m *MsgDisconnect) ProcessMsg(p Protocol, client Client, msg *Message) {
 				update = true
 			}
 		}
+
+		if err := notifyOtherClientQueueInfo(); err != nil {
+			client.Exit()
+		}
+
+		//// 如果有客户端断开连接,就检查是否通知其他排队的客户端
+		//if queue.QueuedClients.Front() != nil && queue.AuthClients < queue.MaxClients {
+		//	qc := queue.QueuedClients.Front().Value.(*queue.QueueClient)
+		//
+		//	buf := new(bytes.Buffer)
+		//	packer := binpacker.NewPacker(buf, binary.BigEndian)
+		//	packer.PushByte(0x05)
+		//	packer.PushInt32(10012)
+		//
+		//	var flag byte
+		//	uuid := qc.Session
+		//	addr := "127.0.0.1:60060"
+		//	len := 1 + len(uuid) + len(addr) // flag uuid addr
+		//	flag = '1'
+		//	packer.PushInt32((int32(len)))
+		//	packer.PushByte(flag)
+		//	packer.PushString(uuid)
+		//	packer.PushString(addr)
+		//
+		//	if _, err := notice(qc.Conn, buf.Bytes()); err != nil {
+		//	}
+		//
+		//	// TODO NOTE 向客户端发送重新登录消息,不管发送成功还是失败,都断开连接
+		//	qc.Conn.Close()
+		//}
 	} else {
 		ServerLogger.Info("not find client", client.GetID(), queue.ClientsMap)
 	}
+}
+
+func notifyOtherClientQueueInfo() error {
+	// 有客户端断连接,就通知其当前排队情况
+	for element := queue.QueuedClients.Front(); element != nil; element = element.Next() {
+		qc := element.Value.(*queue.QueueClient)
+
+		buf := new(bytes.Buffer)
+		packer := binpacker.NewPacker(buf, binary.BigEndian)
+		packer.PushByte(0x05)
+		packer.PushInt32(10012)
+		len := 1 + 4 + 4 + 4 // flag + queue inQueue time
+
+		interVal := queue.GetInterVal()
+		var que, inQueue, time int
+		var flag byte
+		que = queue.GetQueueClients()
+		if que <= 0 {
+			flag = '0'
+		}
+		inQueue = queue.GetQueuedIndex(qc.ID)
+		time = (int)(interVal) * (inQueue + 1)
+
+		packer.PushInt32((int32)(len))
+		packer.PushByte(flag)
+		packer.PushInt32((int32)(que))
+		packer.PushInt32((int32)(inQueue))
+		packer.PushInt32((int32)(time))
+
+		if _, err := notice(qc.Conn, buf.Bytes()); err != nil {
+			ServerLogger.Info("failed to send response ->%s", err)
+			return err
+		}
+	}
+	return nil
+}
+
+func notice(conn net.Conn, by []byte) (n int, err error) {
+	if n, err := conn.Write(by); err != nil {
+		return n, err
+	}
+	return n, nil
 }

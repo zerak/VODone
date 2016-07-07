@@ -67,7 +67,7 @@ type MsgSyncQ2L struct {
 }
 type MsgSyncL2Q struct {
 	Max  int // 服务器最大承载人数
-	Cur  int // 当前服务器已连接人数
+	Auth int // 当前服务器已成功登录的人数
 	Time int // 每接入一个client所需时间s
 }
 
@@ -81,8 +81,8 @@ type MsgSyncL2Q struct {
 	h:0x05, cmd:10011,len:0
 	msg pong queueserver2client
 	h:0x05, cmd:10012,len:0
-	flag/queue/inqueue/time
-	flag/uuid/addr
+	flag/queue/inqueue/time flag 0
+	flag/uuid/addr	flag 1
 */
 type MsgPingC2Q struct {
 }

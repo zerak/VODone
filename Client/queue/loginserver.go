@@ -1,4 +1,4 @@
-package login
+package queue
 
 import (
 	"bufio"
@@ -13,29 +13,28 @@ import (
 	"github.com/zhuangsirui/binpacker"
 
 	"VODone/Client/msgs"
-	"VODone/Client/queue"
 )
 
-var ReaderLogin *bufio.Reader
-var WriterLogin *bufio.Writer
-var writeLockLogin sync.RWMutex
-var MsgChanLogin chan *msgs.Message
-var ExitChanLogin chan int
-var PoolLogin sync.Pool
+var ReaderLoginQueue *bufio.Reader
+var WriterLoginQueue *bufio.Writer
+var writeLockLoginQueue sync.RWMutex
+var MsgChanLoginQueue chan *msgs.Message
+var ExitChanLoginQueue chan int
+var PoolLoginQueue sync.Pool
 
 func init() {
-	MsgChanLogin = make(chan *msgs.Message, 10000)
-	PoolLogin.New = func() interface{} {
+	MsgChanLoginQueue = make(chan *msgs.Message, 10000)
+	PoolLoginQueue.New = func() interface{} {
 		return &msgs.Message{
 			Timestamp: time.Now(),
 		}
 	}
-	ExitChanLogin = make(chan int, 1)
+	ExitChanLoginQueue = make(chan int, 1)
 }
 
-func StartLoginServerLoop(conn net.Conn) {
+func QueueStartLoginServerLoop(conn net.Conn) {
 	fmt.Printf("LoginServer start goroutine\n")
-	if _, err := Send2Login(conn, []byte("  V1")); err != nil {
+	if _, err := QueueSend2Login(conn, []byte("  V1")); err != nil {
 		fmt.Printf("send protocol err\n")
 		panic(err)
 	}
@@ -58,10 +57,10 @@ func client2LoginServerLoop(client net.Conn) {
 
 	buf := make([]byte, msgs.ProtocolHeaderLen)
 	for {
-		_, err = io.ReadFull(ReaderLogin, buf)
+		_, err = io.ReadFull(ReaderLoginQueue, buf)
 		if err != nil {
-			fmt.Printf("client2LoginServerLoop read head from remote[%v] err->%v buffed->%v\n", client.RemoteAddr(), err, ReaderLogin.Buffered())
-			//ExitChanLogin <- 1
+			fmt.Printf("client2LoginServerLoop read head from remote[%v] err->%v buffed->%v\n", client.RemoteAddr(), err, ReaderLoginQueue.Buffered())
+			//ExitChanLoginQueue <- 1
 			break
 		}
 
@@ -69,7 +68,7 @@ func client2LoginServerLoop(client net.Conn) {
 		header = buf[0]
 		if header != 0x05 {
 			err = fmt.Errorf("client2LoginServerLoop header[%s] err", header)
-			//ExitChanLogin <- 1
+			//ExitChanLoginQueue <- 1
 			break
 		}
 
@@ -81,10 +80,10 @@ func client2LoginServerLoop(client net.Conn) {
 
 		// data
 		data := make([]byte, length)
-		_, err = io.ReadFull(ReaderLogin, data)
+		_, err = io.ReadFull(ReaderLoginQueue, data)
 		if err != nil {
-			fmt.Printf("client2LoginServerLoop read data from client[%v] err->%v buffed->%v", client.RemoteAddr(), err, ReaderLogin.Buffered())
-			//ExitChanLogin <- 1
+			fmt.Printf("client2LoginServerLoop read data from client[%v] err->%v buffed->%v", client.RemoteAddr(), err, ReaderLoginQueue.Buffered())
+			//ExitChanLoginQueue <- 1
 			break
 		}
 
@@ -99,12 +98,13 @@ func client2LoginServerLoop(client net.Conn) {
 		msg.Len = (int)(length)
 		msg.Conn = client
 
-		MsgChanLogin <- &msg
+		MsgChanLoginQueue <- &msg
 	}
 
+	client.Close()
+	//ExitChanLoginQueue <- 1
+
 	defer func() {
-		client.Close()
-		//ExitChanLogin <- 1
 		fmt.Printf("client2LoginServerLoop cid[%v] exit\n", client.LocalAddr().String())
 	}()
 }
@@ -114,7 +114,6 @@ func clientMsgPumpLogin(client net.Conn, startedChan chan bool) {
 
 	hbTickerLogin := time.NewTicker(msgs.C2LoginServerHB)
 	hbChanLogin := hbTickerLogin.C
-	quit := false
 	for {
 		select {
 		case <-hbChanLogin:
@@ -125,18 +124,18 @@ func clientMsgPumpLogin(client net.Conn, startedChan chan bool) {
 			packer.PushInt32(0)
 			if err := packer.Error(); err != nil {
 				fmt.Printf("clientMsgPumpLogin make msg err [%v]\n", err)
-				ExitChanLogin <- 1
+				ExitChanLoginQueue <- 1
 			}
 
 			//fmt.Printf("clientMsgPumpLogin heartbeat cid[%v] buf[%x] \n", client.LocalAddr().String(), buf.Bytes())
 
-			if n, err := Send2Login(client, buf.Bytes()); err != nil || n != 9 {
+			if n, err := QueueSend2Login(client, buf.Bytes()); err != nil || n != 9 {
 				fmt.Printf("clientMsgPumpLogin send heartbeat packet err[%v] \n", err)
-				ExitChanLogin <- 1
+				ExitChanLoginQueue <- 1
 			} else {
 				//fmt.Printf("msg hb len[%v]\n", n)
 			}
-		case msg, ok := <-MsgChanLogin:
+		case msg, ok := <-MsgChanLoginQueue:
 			if ok {
 				//fmt.Printf("clientMsgPumpLogin cid[%v] msgChan msg[%v] body[%v]\n", client.LocalAddr().String(), msg.ID, msg.Body)
 				if msg.ID == 10014 {
@@ -148,7 +147,7 @@ func clientMsgPumpLogin(client net.Conn, startedChan chan bool) {
 					var flag byte
 					if err := unpacker.FetchByte(&flag).Error(); err != nil {
 						fmt.Printf("clientMsgPumpLogin unpacker err[%v]\n", err)
-						ExitChanLogin <- 1
+						ExitChanLoginQueue <- 1
 					}
 
 					//fmt.Printf("clientMsgPumpLogin cid[%v] flag[%v]\n", client.LocalAddr().String(), flag)
@@ -161,93 +160,94 @@ func clientMsgPumpLogin(client net.Conn, startedChan chan bool) {
 							fmt.Printf("clientMsgPumpLogin login failed and get queue server addr err\n")
 						}
 						fmt.Printf("clientMsgPumpLogin login failed and redirect to queue server[%v]\n", addr)
-						queue.Connect2QueueServer(addr)
-						ExitChanLogin <- 1
+						Connect2QueueServer(addr)
+						ExitChanLoginQueue <- 1
 					} else {
 						var uid int64
 						var name string
 						len := uint64(msg.Len - 1 - 8)
 						if err := unpacker.FetchInt64(&uid).FetchString(len, &name).Error(); err != nil {
 							fmt.Printf("clientMsgPumpLogin login success but unpack failed [%v]\n", err)
-							ExitChanLogin <- 1
+							ExitChanLoginQueue <- 1
 						}
 						fmt.Printf("clientMsgPumpLogin login success uid[%v] name[%v]\n", uid, name)
 					}
 				}
 			} else {
 				fmt.Printf("clientMsgPumpLogin from MsgChan not ok\n")
-				ExitChanLogin <- 1
+				ExitChanLoginQueue <- 1
 			}
-		case <-ExitChanLogin:
+		case <-ExitChanLoginQueue:
 			fmt.Printf("clientMsgPumpLogin exitChan recv EXIT\n")
-			quit = true
-		}
-		if quit {
-			break
+			goto exit
 		}
 	}
 
+exit:
+	client.Close()
+	hbTickerLogin.Stop()
+	close(ExitChanLoginQueue)
+
 	defer func() {
-		client.Close()
-		hbTickerLogin.Stop()
-		close(ExitChanLogin)
 		fmt.Printf("clientMsgPumpLogin exit\n")
 	}()
 }
 
-func Send2Login(c net.Conn, data []byte) (int, error) {
-	writeLockLogin.Lock()
+func QueueSend2Login(c net.Conn, data []byte) (int, error) {
+	writeLockLoginQueue.Lock()
 	// todo
 
 	// check write len(data) size buf
-	n, err := WriterLogin.Write(data)
+	n, err := WriterLoginQueue.Write(data)
 	if err != nil {
-		writeLockLogin.Unlock()
+		writeLockLoginQueue.Unlock()
 		return n, err
 	}
-	WriterLogin.Flush()
-	writeLockLogin.Unlock()
+	WriterLoginQueue.Flush()
+	writeLockLoginQueue.Unlock()
 
 	return n, nil
 }
 
-func SendLoginPakcet(conn net.Conn) {
+func SendLoginPakcetWithKey(conn net.Conn, uuid string) {
+	// todo
 	// 向LoginServer发送登录信息
 	buf := new(bytes.Buffer)
 	packer := binpacker.NewPacker(buf, binary.BigEndian)
 	packer.PushByte(0x05)
 	packer.PushInt32(10013)
 	var flag byte
-	flag = '0'
+	flag = '1'
 	accout := "account"
 	passwd := "passwd"
-	len := 1 + len(accout) + len(passwd)
+	key := uuid
+	len := 1 + len(accout) + len(passwd) + len(uuid)
 	packer.PushInt32((int32)(len))
 	packer.PushByte(flag)
-	packer.PushString(accout)
-	packer.PushString(passwd)
+	packer.PushString(key)
+	packer.PushString(accout).PushString(passwd)
 	if err := packer.Error(); err != nil {
 		fmt.Printf("make msg err [%v]\n", err)
 		panic(err)
 	}
 
-	//fmt.Printf("client send c2slogin packet buf[%v] dataLen[%v]\n", buf.Bytes(), len)
+	fmt.Printf("client reconnect to loginserver c2slogin packet buf[%x] dataLen[%v]\n", buf.Bytes(), len)
 
-	if _, err := Send2Login(conn, buf.Bytes()); err != nil {
+	if _, err := QueueSend2Login(conn, buf.Bytes()); err != nil {
 		fmt.Printf("send c2slogin packet err[%v] \n", err)
 		panic(err)
 	}
 }
 
-func Connect2LoginServer(addr string) net.Conn {
+func QueueConnect2LoginServer(addr string) net.Conn {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		panic(err)
 	}
 
-	ReaderLogin = bufio.NewReaderSize(conn, msgs.DefaultBufferSize)
-	WriterLogin = bufio.NewWriterSize(conn, msgs.DefaultBufferSize)
+	ReaderLoginQueue = bufio.NewReaderSize(conn, msgs.DefaultBufferSize)
+	WriterLoginQueue = bufio.NewWriterSize(conn, msgs.DefaultBufferSize)
 
-	StartLoginServerLoop(conn)
+	QueueStartLoginServerLoop(conn)
 	return conn
 }

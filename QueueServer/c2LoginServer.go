@@ -41,6 +41,7 @@ func init() {
 	}
 	ExitChanLogin = make(chan int, 1)
 }
+
 func startLoginServerLoop(conn net.Conn) {
 	fmt.Printf("LoginServer start goroutine\n")
 	if _, err := Send2Login(conn, []byte("  V1")); err != nil {
@@ -174,17 +175,20 @@ func clientMsgPumpLogin(client net.Conn, startedChan chan bool) {
 					packer := binpacker.NewPacker(buf, binary.BigEndian)
 					packer.PushString(string(msg.Body[:]))
 					unpacker := binpacker.NewUnpacker(buf, binary.BigEndian)
-					var max, cur, time int32
-					unpacker.FetchInt32(&max).FetchInt32(&cur).FetchInt32(&time)
+					var max, auth, time int32
+					unpacker.FetchInt32(&max).FetchInt32(&auth).FetchInt32(&time)
 					if err := unpacker.Error(); err != nil {
 						ExitChanLogin <- 1
 					}
 					queue.SetMaxClients(max)
-					queue.SetCurClients(cur)
+					queue.SetAuthClients(auth)
 					queue.SetInterVal(time)
 					// todo NOTE 发送消息的设置时机
 					queue.Timer = (int)(time)
-					//fmt.Printf("clientMsgPumpLogin msgsync login2queue max[%v] cur[%v] time[%v]\n", max, cur, time)
+
+					// 通知定时器检查是否发送
+					queue.NotifyChan <- 1
+					//fmt.Printf("clientMsgPumpLogin msgsync login2queue max[%v] auth[%v] time[%v]\n", max, auth, time)
 				}
 
 			} else {

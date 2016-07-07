@@ -1,13 +1,13 @@
 package queue
 
 import (
-	"bitbucket.org/serverFramework/serverFramework/core"
 	"bufio"
-	"fmt"
 	"net"
 	"strconv"
 	"sync"
 	"time"
+
+	"bitbucket.org/serverFramework/serverFramework/core"
 )
 
 type QueueClient struct {
@@ -76,7 +76,6 @@ func (qc *QueueClient) GetIndex() int {
 }
 
 func (qc *QueueClient) Notify(uid int64, tpe string) {
-	fmt.Printf("QueueClient notify uid[%v] type[%v]\n", uid, tpe)
 	id, _ := strconv.Atoi(qc.ClientID)
 	if uid != (int64)(id) {
 		return
