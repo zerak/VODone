@@ -15,7 +15,9 @@ func init() {
 
 func main() {
 	// 1,first connect to login server
-	conn := Connect2LoginServer(addr)
+	loginchan := make(chan bool)
+	conn := Connect2LoginServer(addr, loginchan)
+	<-loginchan
 	SendLoginPakcet(conn)
 
 	msgs.WG.Wait()

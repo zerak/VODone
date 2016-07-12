@@ -16,8 +16,7 @@ type MsgLogin struct {
 }
 
 func (m *MsgLogin) ProcessMsg(p Protocol, client Client, msg *Message) {
-	ServerLogger.Info("MsgLogin cid[%v] msg login msgId[%v] msgBody[%v] auth[%v]Allo[%v]", client.GetID(), msg.ID, msg.Body, ServerApp.GetAuthClients(), ServerApp.GetAllowClients())
-	ServerLogger.Info("MsgLogin auth? ", client.GetAuth())
+	ServerLogger.Info("MsgLogin cid[%v] auth?[%v] auth[%v]Allo[%v]", client.GetID(), client.GetAuth(), ServerApp.GetAuthClients(), ServerApp.GetAllowClients())
 	// A TODO
 	// 检查客户端发送包是否有排队session标识
 	// 如果是之前排过队,并且当前服务器未超过最大客户端数量,则客户端直接进入登录流程

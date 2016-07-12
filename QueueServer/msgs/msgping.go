@@ -1,9 +1,9 @@
 package msgs
 
 import (
-	"fmt"
 	"bytes"
 	"encoding/binary"
+	"fmt"
 
 	"github.com/zhuangsirui/binpacker"
 

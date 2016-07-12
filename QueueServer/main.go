@@ -57,7 +57,7 @@ func serveQueue() {
 	core.ServerLogger.Info("QueueServer start timer routine")
 	for {
 		select {
-		case <- queue.NotifyChan:
+		case <-queue.NotifyChan:
 			if queue.QueuedClients.Front() != nil && queue.AuthClients < queue.MaxClients {
 				qc := queue.QueuedClients.Front().Value.(*queue.QueueClient)
 

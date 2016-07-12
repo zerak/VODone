@@ -1,17 +1,17 @@
 package msgs
 
 import (
-	"net"
 	"bytes"
 	"container/list"
 	"encoding/binary"
+	"net"
 
 	"github.com/zhuangsirui/binpacker"
 
-	"bitbucket.org/serverFramework/serverFramework/utils"
 	. "bitbucket.org/serverFramework/serverFramework/client"
 	. "bitbucket.org/serverFramework/serverFramework/core"
 	. "bitbucket.org/serverFramework/serverFramework/protocol"
+	"bitbucket.org/serverFramework/serverFramework/utils"
 
 	"VODone/QueueServer/queue"
 )
@@ -20,7 +20,7 @@ type MsgConnect struct {
 }
 
 func (m *MsgConnect) ProcessMsg(p Protocol, client Client, msg *Message) {
-	ServerLogger.Info("MsgConnect cid[%v] msg connect", client.GetID())
+	ServerLogger.Info("MsgConnect cid[%v] addr[%v]", client.GetID(), client.String())
 	// todo QueueServer UUID seesion
 	// QueueServer里的UUID、应该从LoginServer提供的seesion队列里拿
 	// 比如一次性生成几十G的数据放入redis数据库里
@@ -45,9 +45,10 @@ type MsgDisconnect struct {
 }
 
 func (m *MsgDisconnect) ProcessMsg(p Protocol, client Client, msg *Message) {
-	ServerLogger.Info("MsgDisconnect cid[%v] msg disconnect", client.GetID())
+	ServerLogger.Info("MsgDisconnect cid[%v] addr[%v]", client.GetID(), client.String())
 	// 1,remove from queue list and map
 	// 2,update clients index
+	// 3,notify other clients to update queued info
 	if _, ok := queue.ClientsMap[client.GetID()]; ok {
 		// remove
 		update := false
@@ -104,7 +105,7 @@ func (m *MsgDisconnect) ProcessMsg(p Protocol, client Client, msg *Message) {
 }
 
 func notifyOtherClientQueueInfo() error {
-	// 有客户端断连接,就通知其当前排队情况
+	// 有客户端断连接,就通知其他客户端当前排队情况
 	for element := queue.QueuedClients.Front(); element != nil; element = element.Next() {
 		qc := element.Value.(*queue.QueueClient)
 
@@ -131,8 +132,8 @@ func notifyOtherClientQueueInfo() error {
 		packer.PushInt32((int32)(time))
 
 		if _, err := notice(qc.Conn, buf.Bytes()); err != nil {
-			ServerLogger.Info("failed to send response ->%s", err)
-			return err
+			ServerLogger.Info("failed to send[%v] response ->%s", qc.Conn.RemoteAddr().String(), err)
+			//return err
 		}
 	}
 	return nil

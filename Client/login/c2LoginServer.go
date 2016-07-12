@@ -33,7 +33,7 @@ func init() {
 	ExitChanLogin = make(chan int, 1)
 }
 
-func StartLoginServerLoop(conn net.Conn) {
+func StartLoginServerLoop(conn net.Conn, singin chan bool) {
 	fmt.Printf("LoginServer start goroutine\n")
 	if _, err := Send2Login(conn, []byte("  V1")); err != nil {
 		fmt.Printf("send protocol err\n")
@@ -41,12 +41,11 @@ func StartLoginServerLoop(conn net.Conn) {
 	}
 
 	msgs.WG.Wrap(func() {
-		client2LoginServerLoop(conn)
+		client2LoginServerLoop(conn, singin)
 	})
 }
 
-func client2LoginServerLoop(client net.Conn) {
-	fmt.Printf("client2LoginServerLoop remoteAddr[%v] localAddr[%v]\n", client.RemoteAddr(), client.LocalAddr())
+func client2LoginServerLoop(client net.Conn, singin chan bool) {
 	var err error
 	var header byte
 	var cmd uint32
@@ -55,6 +54,8 @@ func client2LoginServerLoop(client net.Conn) {
 	msgPumpStartedChan := make(chan bool)
 	go clientMsgPumpLogin(client, msgPumpStartedChan)
 	<-msgPumpStartedChan
+	close(singin)
+	fmt.Printf("client2LoginServerLoop remoteAddr[%v] localAddr[%v]\n", client.RemoteAddr(), client.LocalAddr())
 
 	buf := make([]byte, msgs.ProtocolHeaderLen)
 	for {
@@ -239,7 +240,7 @@ func SendLoginPakcet(conn net.Conn) {
 	}
 }
 
-func Connect2LoginServer(addr string) net.Conn {
+func Connect2LoginServer(addr string, singin chan bool) net.Conn {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		panic(err)
@@ -248,6 +249,6 @@ func Connect2LoginServer(addr string) net.Conn {
 	ReaderLogin = bufio.NewReaderSize(conn, msgs.DefaultBufferSize)
 	WriterLogin = bufio.NewWriterSize(conn, msgs.DefaultBufferSize)
 
-	StartLoginServerLoop(conn)
+	StartLoginServerLoop(conn, singin)
 	return conn
 }
